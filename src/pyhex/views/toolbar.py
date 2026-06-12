@@ -16,14 +16,24 @@ BAR_H   = 8   # slider track height
 
 
 class ToolBar:
-    def __init__(self, state: AppState, font: pygame.font.Font):
-        self.state = state
-        self.font  = font
+    def __init__(self, state: AppState, font: pygame.font.Font,
+                 on_open: "callable | None" = None):
+        self.state    = state
+        self.font     = font
+        self._on_open = on_open
         self._rects: dict[str, pygame.Rect] = {}
+        self._open_rect     = pygame.Rect(0, 0, 0, 0)
         self._slider_rect   = pygame.Rect(0, 0, 0, 0)
         self._dragging_slider = False
 
     def handle_event(self, event: pygame.event.Event) -> bool:
+        # ---- open button ----
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._open_rect.collidepoint(event.pos):
+                if self._on_open:
+                    self._on_open()
+                return True
+
         # ---- tool buttons ----
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for name, rect in self._rects.items():
@@ -60,11 +70,21 @@ class ToolBar:
         x = rect.x + BTN_PAD
         y = rect.y + BTN_PAD
 
+        btn_w = rect.width - BTN_PAD * 2
+
+        # Open file button (top)
+        open_rect = pygame.Rect(x, y, btn_w, BTN_H)
+        self._open_rect = open_rect
+        pygame.draw.rect(surf, (55, 80, 55), open_rect, border_radius=3)
+        pygame.draw.rect(surf, config.COLOR_BORDER, open_rect, 1, border_radius=3)
+        open_lbl = self.font.render("Open tileset...  [Ctrl+O]", True, config.COLOR_TEXT)
+        surf.blit(open_lbl, (x + 6, y + (BTN_H - open_lbl.get_height()) // 2))
+        y += BTN_H + BTN_PAD * 2
+
         label = self.font.render("Tools", True, config.COLOR_TEXT)
         surf.blit(label, (x, y))
         y += label.get_height() + BTN_PAD
 
-        btn_w = rect.width - BTN_PAD * 2
         for name, display, shortcut in TOOLS:
             btn_rect = pygame.Rect(x, y, btn_w, BTN_H)
             self._rects[name] = btn_rect

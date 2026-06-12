@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 import sys
 import pygame
 from pyhex import config
@@ -14,6 +15,7 @@ from pyhex.views.toolbar import ToolBar
 from pyhex.views.palette import ColorPalette
 from pyhex.views.editor import TileEditor
 from pyhex.views.overview import TilesetOverview
+from pyhex.views.file_browser import FileBrowser
 
 
 class Application:
@@ -21,7 +23,6 @@ class Application:
         self.screen = pygame.display.set_mode(
             (config.WINDOW_W, config.WINDOW_H), pygame.RESIZABLE
         )
-        pygame.display.set_caption("pyhex — Hex Tile Editor")
         self.clock = pygame.time.Clock()
 
         tile_w, tile_h = hex_tile_size(tile_size)
@@ -40,10 +41,13 @@ class Application:
         }
 
         font = pygame.font.SysFont(None, 20)
-        self.toolbar  = ToolBar(self.state, font)
+        self.toolbar  = ToolBar(self.state, font, on_open=self._open_file)
         self.palette  = ColorPalette(self.state, font)
         self.editor   = TileEditor(self.state, self.hex_mask, self.tools, font)
         self.overview = TilesetOverview(self.state, self.hex_mask, font)
+
+        self._file_browser: FileBrowser | None = None
+        self._update_caption()
 
     def run(self) -> None:
         while True:
@@ -59,6 +63,15 @@ class Application:
 
     # ------------------------------------------------------------------
     def _dispatch(self, event: pygame.event.Event) -> bool:
+        if self._file_browser is not None:
+            self._file_browser.handle_event(event, self.screen.get_size())
+            if self._file_browser.done:
+                path = self._file_browser.result
+                self._file_browser = None
+                if path:
+                    self._load_tileset(path)
+            return True   # modal absorbs all events
+
         return (
             self.toolbar.handle_event(event)
             or self.palette.handle_event(event)
@@ -75,6 +88,8 @@ class Application:
                 self.state.undo()
             elif ctrl and event.key == pygame.K_y:
                 self.state.redo()
+            elif ctrl and event.key == pygame.K_o:
+                self._open_file()
             elif event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS:
                 self.state.zoom = min(config.MAX_ZOOM, self.state.zoom + 1)
             elif event.key == pygame.K_MINUS:
@@ -84,15 +99,34 @@ class Application:
         if self.state.dirty:
             self.state.save(mask=self.hex_mask)
 
+    def _open_file(self) -> None:
+        if self._file_browser is not None:
+            return  # already open
+        start = (str(Path(self.state.tileset.path).parent)
+                 if self.state.tileset else ".")
+        self._file_browser = FileBrowser(start)
+
+    def _load_tileset(self, path: str) -> None:
+        if self.state.dirty:
+            self.state.save(mask=self.hex_mask)
+        self.state.tileset = Tileset(path, self.state.tile_w, self.state.tile_h)
+        self.state.select_tile(0, 0)
+        self._update_caption()
+
+    def _update_caption(self) -> None:
+        name = (Path(self.state.tileset.path).name
+                if self.state.tileset else "pyhex")
+        pygame.display.set_caption(f"pyhex — {name}")
+
     def _render(self) -> None:
         sw, sh = self.screen.get_size()
 
-        left_w = config.LEFT_PANEL_W
+        left_w     = config.LEFT_PANEL_W
         overview_h = config.OVERVIEW_H
-        toolbar_h = config.TOOLBAR_H
-        editor_x = left_w
-        editor_w = sw - left_w
-        editor_h = sh - overview_h
+        toolbar_h  = config.TOOLBAR_H
+        editor_x   = left_w
+        editor_w   = sw - left_w
+        editor_h   = sh - overview_h
 
         toolbar_rect  = pygame.Rect(0, 0, left_w, toolbar_h)
         palette_rect  = pygame.Rect(0, toolbar_h, left_w, editor_h - toolbar_h)
@@ -105,9 +139,12 @@ class Application:
         self.editor.draw(self.screen, editor_rect)
         self.overview.draw(self.screen, overview_rect)
 
-        # Title bar update with save hint
-        title = "pyhex"
+        if self._file_browser is not None:
+            self._file_browser.draw(self.screen)
+
+        # Title bar
+        title = f"pyhex — {Path(self.state.tileset.path).name}" \
+                if self.state.tileset else "pyhex"
         if self.state.dirty:
             title += " *"
-        title += "  |  Ctrl+S to save"
         pygame.display.set_caption(title)
