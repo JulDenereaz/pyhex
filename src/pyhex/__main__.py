@@ -21,7 +21,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    pygame.init()
+    pygame.display.init()
+    pygame.font.init()
     try:
         app = Application(tileset_path=args.tileset, tile_size=args.tile_size)
         app.run()
@@ -29,7 +30,8 @@ def main() -> None:
         print(f"Fatal error: {exc}", file=sys.stderr)
         raise
     finally:
-        pygame.quit()
+        pygame.font.quit()
+        pygame.display.quit()
 
 
 if __name__ == "__main__":
