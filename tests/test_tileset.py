@@ -7,7 +7,7 @@ from pyhex.tileset import Tileset
 
 @pytest.fixture
 def tmp_tileset(tmp_path):
-    tw, th = 64, 55
+    tw, th = 64, 64   # square tiles
     img = Image.new("RGBA", (tw * 4, th * 3), (0, 0, 0, 0))
     # Paint a distinctive pixel in tile (1, 2)
     img.putpixel((2 * tw + 10, 1 * th + 10), (255, 0, 128, 255))
