@@ -40,7 +40,7 @@ class Application:
         font = pygame.font.SysFont(None, 20)
         self.toolbar  = ToolBar(self.state, font)
         self.palette  = ColorPalette(self.state, font)
-        self.editor   = TileEditor(self.state, self.hex_mask, self.tools)
+        self.editor   = TileEditor(self.state, self.hex_mask, self.tools, font)
         self.overview = TilesetOverview(self.state, self.hex_mask, font)
 
     def run(self) -> None:
@@ -67,7 +67,7 @@ class Application:
     def _handle_global(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_s and (event.mod & pygame.KMOD_CTRL):
-                self.state.save()
+                self.state.save(mask=self.hex_mask)
             elif event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS:
                 self.state.zoom = min(config.MAX_ZOOM, self.state.zoom + 1)
             elif event.key == pygame.K_MINUS:
@@ -75,7 +75,7 @@ class Application:
 
     def _handle_quit(self) -> None:
         if self.state.dirty:
-            self.state.save()
+            self.state.save(mask=self.hex_mask)
 
     def _render(self) -> None:
         sw, sh = self.screen.get_size()

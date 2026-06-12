@@ -39,16 +39,19 @@ class Tileset:
     def set_tile(self, row: int, col: int, data: np.ndarray) -> None:
         self.tiles[row][col] = data.copy()
 
-    def save(self) -> None:
+    def save(self, mask: "np.ndarray | None" = None) -> None:
         h = self.rows * self.tile_h
         w = self.cols * self.tile_w
         arr = np.zeros((h, w, 4), dtype=np.uint8)
         for r in range(self.rows):
             for c in range(self.cols):
+                tile = self.tiles[r][c].copy()
+                if mask is not None:
+                    tile[~mask, 3] = 0   # zero alpha outside hex on disk
                 arr[
                     r * self.tile_h : (r + 1) * self.tile_h,
                     c * self.tile_w : (c + 1) * self.tile_w,
-                ] = self.tiles[r][c]
+                ] = tile
         Image.fromarray(arr, "RGBA").save(self.path)
 
     def reload(self) -> None:

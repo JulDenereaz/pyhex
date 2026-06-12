@@ -6,8 +6,8 @@ from pyhex.hex_geometry import hex_tile_size, make_hex_mask, hex_polygon_points
 
 def test_tile_size_dimensions():
     w, h = hex_tile_size(32)
-    assert w == 64
-    assert h == round(sqrt(3) * 32)
+    assert w == round(sqrt(3) * 32)   # narrower (flat-edge to flat-edge)
+    assert h == 64                     # taller (tip to tip)
 
 
 def test_mask_shape():

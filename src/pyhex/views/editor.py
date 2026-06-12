@@ -9,14 +9,21 @@ from pyhex.state import AppState
 class TileEditor:
     """Zoomed pixel-by-pixel editor for the currently selected hex tile."""
 
-    def __init__(self, state: AppState, mask: np.ndarray, tools: dict):
+    def __init__(self, state: AppState, mask: np.ndarray, tools: dict,
+                 font: pygame.font.Font):
         self.state = state
         self.mask = mask
         self.tools = tools
+        self.font = font
         self._rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
         self._mouse_held = False
         self._last_pixel: tuple[int, int] | None = None
+        self._origin: tuple[int, int] = (0, 0)
+        # Overlay cached per zoom level — rebuilt only on zoom change
+        self._overlay_cache: pygame.Surface | None = None
+        self._overlay_zoom: int = -1
 
+    # ------------------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> bool:
         if self.state.active_tile_data is None:
             return False
@@ -45,14 +52,14 @@ class TileEditor:
                     self._last_pixel = (px, py)
                 return True
 
-        # Zoom with mouse wheel
         if event.type == pygame.MOUSEWHEEL and self._rect.collidepoint(pygame.mouse.get_pos()):
-            self.state.zoom = max(config.MIN_ZOOM, min(config.MAX_ZOOM,
-                                                        self.state.zoom + event.y))
+            self.state.zoom = max(config.MIN_ZOOM,
+                                  min(config.MAX_ZOOM, self.state.zoom + event.y))
             return True
 
         return False
 
+    # ------------------------------------------------------------------
     def draw(self, surf: pygame.Surface, rect: pygame.Rect) -> None:
         self._rect = rect
         pygame.draw.rect(surf, config.COLOR_BG, rect)
@@ -60,8 +67,7 @@ class TileEditor:
 
         tile = self.state.active_tile_data
         if tile is None:
-            msg = pygame.font.SysFont(None, 24).render(
-                "Click a tile below to edit", True, config.COLOR_TEXT)
+            msg = self.font.render("Click a tile below to edit", True, config.COLOR_TEXT)
             surf.blit(msg, (rect.centerx - msg.get_width() // 2,
                             rect.centery - msg.get_height() // 2))
             return
@@ -71,37 +77,41 @@ class TileEditor:
         scaled_w = tw * zoom
         scaled_h = th * zoom
 
-        # Center tile in editor rect
         ox = rect.x + (rect.width - scaled_w) // 2 + self.state.editor_offset[0]
         oy = rect.y + (rect.height - scaled_h) // 2 + self.state.editor_offset[1]
         self._origin = (ox, oy)
 
-        # Draw pixels
-        tile_surf = pygame.Surface((tw, th), pygame.SRCALPHA)
-        pygame.surfarray.blit_array(tile_surf, tile.transpose(1, 0, 2)[:, :, :3])
-        # Handle alpha separately
-        alpha_arr = tile[:, :, 3].T
-        pygame.surfarray.pixels_alpha(tile_surf)[:] = alpha_arr
-        scaled = pygame.transform.scale(tile_surf, (scaled_w, scaled_h))
-
-        # Clip to editor rect
         clip_rect = rect.inflate(-2, -2)
         old_clip = surf.get_clip()
         surf.set_clip(clip_rect)
+
+        # 1. Tile pixels — outside-hex alpha forced to 0 so corners are invisible
+        tile_surf = pygame.Surface((tw, th), pygame.SRCALPHA)
+        pygame.surfarray.blit_array(tile_surf, tile.transpose(1, 0, 2)[:, :, :3])
+        alpha = pygame.surfarray.pixels_alpha(tile_surf)
+        alpha[:] = (tile[:, :, 3] * self.mask).T   # zero out outside-hex alpha
+        del alpha
+        scaled = pygame.transform.scale(tile_surf, (scaled_w, scaled_h))
         surf.blit(scaled, (ox, oy))
 
-        # Pixel grid (only when zoom >= 4)
+        # 2. Pixel grid inside hex (zoom >= 4)
         if zoom >= 4:
             for gx in range(tw + 1):
                 sx = ox + gx * zoom
-                pygame.draw.line(surf, config.COLOR_GRID, (sx, max(oy, clip_rect.top)),
+                pygame.draw.line(surf, config.COLOR_GRID,
+                                 (sx, max(oy, clip_rect.top)),
                                  (sx, min(oy + scaled_h, clip_rect.bottom)), 1)
             for gy in range(th + 1):
                 sy = oy + gy * zoom
-                pygame.draw.line(surf, config.COLOR_GRID, (max(ox, clip_rect.left), sy),
+                pygame.draw.line(surf, config.COLOR_GRID,
+                                 (max(ox, clip_rect.left), sy),
                                  (min(ox + scaled_w, clip_rect.right), sy), 1)
 
-        # Hex boundary outline
+        # 3. Outside-hex opaque overlay (numpy-cached per zoom)
+        overlay = self._get_overlay(zoom)
+        surf.blit(overlay, (ox, oy))
+
+        # 4. Hex boundary
         pts = hex_polygon_points(tw, th)
         scaled_pts = [(ox + px * zoom, oy + py * zoom) for px, py in pts]
         if len(scaled_pts) >= 3:
@@ -109,36 +119,43 @@ class TileEditor:
 
         surf.set_clip(old_clip)
 
-        # Outside-hex overlay (dim non-editable area)
-        self._draw_mask_overlay(surf, clip_rect, ox, oy, tw, th, zoom)
-
-        # Zoom label
-        font = pygame.font.SysFont(None, 20)
-        zlabel = font.render(f"Zoom: {zoom}x  (scroll to zoom)", True, config.COLOR_TEXT)
+        # Status labels (drawn outside clip so they're always visible)
+        zlabel = self.font.render(
+            f"Zoom: {zoom}x  (scroll to zoom)", True, config.COLOR_TEXT)
         surf.blit(zlabel, (rect.x + 6, rect.bottom - zlabel.get_height() - 4))
 
-        # Dirty indicator
         if self.state.dirty:
-            dlabel = font.render("● unsaved", True, config.COLOR_DIRTY)
+            dlabel = self.font.render("● unsaved", True, config.COLOR_DIRTY)
             surf.blit(dlabel, (rect.right - dlabel.get_width() - 6,
                                rect.bottom - dlabel.get_height() - 4))
 
-    def _draw_mask_overlay(self, surf, clip_rect, ox, oy, tw, th, zoom):
-        """Draw a semi-transparent overlay on pixels outside the hex mask."""
-        overlay = pygame.Surface((tw * zoom, th * zoom), pygame.SRCALPHA)
-        for py in range(th):
-            for px in range(tw):
-                if not self.mask[py, px]:
-                    pygame.draw.rect(overlay, (0, 0, 0, 120),
-                                     (px * zoom, py * zoom, zoom, zoom))
-        old_clip = surf.get_clip()
-        surf.set_clip(clip_rect)
-        surf.blit(overlay, (ox, oy))
-        surf.set_clip(old_clip)
+    # ------------------------------------------------------------------
+    def _get_overlay(self, zoom: int) -> pygame.Surface:
+        """Build (and cache) the opaque outside-hex overlay for the given zoom."""
+        if self._overlay_cache is not None and self._overlay_zoom == zoom:
+            return self._overlay_cache
+
+        th, tw = self.mask.shape
+        # Boolean mask of pixels OUTSIDE the hex, scaled up by zoom
+        outside = (~self.mask).astype(np.uint8)           # (h, w)
+        outside_big = np.repeat(
+            np.repeat(outside, zoom, axis=0), zoom, axis=1
+        )  # (h*zoom, w*zoom)
+
+        # RGBA: alpha=215 where outside, 0 where inside
+        arr = np.zeros((th * zoom, tw * zoom, 4), dtype=np.uint8)
+        outside_bool = outside_big.astype(bool)
+        arr[outside_bool, 3] = 215   # nearly opaque
+
+        surf = pygame.Surface((tw * zoom, th * zoom), pygame.SRCALPHA)
+        pygame.surfarray.blit_array(surf, arr.transpose(1, 0, 2)[:, :, :3])
+        pygame.surfarray.pixels_alpha(surf)[:] = arr[:, :, 3].T
+
+        self._overlay_cache = surf
+        self._overlay_zoom = zoom
+        return surf
 
     def _screen_to_pixel(self, pos: tuple[int, int]) -> tuple[int, int]:
-        ox, oy = getattr(self, "_origin", (self._rect.x, self._rect.y))
+        ox, oy = self._origin
         zoom = self.state.zoom
-        px = (pos[0] - ox) // zoom
-        py = (pos[1] - oy) // zoom
-        return px, py
+        return (pos[0] - ox) // zoom, (pos[1] - oy) // zoom

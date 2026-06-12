@@ -33,8 +33,8 @@ class AppState:
             r, c = self.selected_tile
             self.tileset.set_tile(r, c, self.active_tile_data)
 
-    def save(self) -> None:
+    def save(self, mask=None) -> None:
         self._commit_tile()
         if self.tileset is not None:
-            self.tileset.save()
+            self.tileset.save(mask=mask)
         self.dirty = False
