@@ -18,6 +18,7 @@ class AppState:
     editor_offset: list[int] = field(default_factory=lambda: [0, 0])  # pan offset px
 
     dirty: bool = False             # unsaved changes to active tile
+    noise_variation: int = 30      # ±channel variation for noise tool (1–100)
     _undo_stack: list = field(default_factory=list, repr=False)
     _redo_stack: list = field(default_factory=list, repr=False)
 

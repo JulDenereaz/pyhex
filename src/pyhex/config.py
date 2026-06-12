@@ -4,7 +4,7 @@ TARGET_FPS = 60
 
 LEFT_PANEL_W = 200
 OVERVIEW_H = 260
-TOOLBAR_H = 170
+TOOLBAR_H = 210
 
 DEFAULT_TILE_SIZE = 64  # tile pixel size (--tile-size N → N×N tile)
 DEFAULT_ZOOM = 8
