@@ -5,12 +5,16 @@ SQRT3 = sqrt(3)
 
 
 def hex_tile_size(tile_size: int) -> tuple[int, int]:
-    """Return (width, height) — square tiles of exactly tile_size × tile_size pixels.
+    """Return (width, height) — natural pointy-top hex bounding box.
 
-    --tile-size 32  →  32×32 tile  (circumradius = 16, inradius ≈ 13.9)
-    --tile-size 64  →  64×64 tile  (circumradius = 32, inradius ≈ 27.7)
+    tile_size is the HEIGHT (= 2×circumradius).  Width = round(√3×Rc) so
+    the flat vertical sides reach the tile edges with no transparent gap.
+
+    --tile-size 32  →  28×32  (Rc=16)
+    --tile-size 64  →  55×64  (Rc=32)
     """
-    return tile_size, tile_size
+    Rc = tile_size / 2
+    return round(SQRT3 * Rc), tile_size
 
 
 def make_hex_mask(width: int, height: int) -> np.ndarray:
