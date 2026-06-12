@@ -36,7 +36,7 @@ def make_hex_mask(width: int, height: int) -> np.ndarray:
 
     top_bottom = dy <= Rc
     lateral    = dx <= Rc * SQRT3 / 2.0   # flat vertical edges
-    diag_edges = dx * SQRT3 + dy <= 2.0 * Rc
+    diag_edges = dx + SQRT3 * dy <= SQRT3 * Rc  # pointy top/bottom
 
     return top_bottom & lateral & diag_edges
 
