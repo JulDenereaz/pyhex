@@ -18,6 +18,30 @@ class AppState:
     editor_offset: list[int] = field(default_factory=lambda: [0, 0])  # pan offset px
 
     dirty: bool = False             # unsaved changes to active tile
+    _undo_stack: list = field(default_factory=list, repr=False)
+    _redo_stack: list = field(default_factory=list, repr=False)
+
+    def push_undo(self) -> None:
+        if self.active_tile_data is None:
+            return
+        self._undo_stack.append(self.active_tile_data.copy())
+        if len(self._undo_stack) > 50:
+            self._undo_stack.pop(0)
+        self._redo_stack.clear()
+
+    def undo(self) -> None:
+        if not self._undo_stack:
+            return
+        self._redo_stack.append(self.active_tile_data.copy())
+        self.active_tile_data = self._undo_stack.pop()
+        self.dirty = True
+
+    def redo(self) -> None:
+        if not self._redo_stack:
+            return
+        self._undo_stack.append(self.active_tile_data.copy())
+        self.active_tile_data = self._redo_stack.pop()
+        self.dirty = True
 
     def select_tile(self, row: int, col: int) -> None:
         if self.dirty:
@@ -27,6 +51,8 @@ class AppState:
             self.active_tile_data = self.tileset.get_tile(row, col).copy()
         self.dirty = False
         self.editor_offset = [0, 0]
+        self._undo_stack.clear()
+        self._redo_stack.clear()
 
     def _commit_tile(self) -> None:
         if self.tileset is not None and self.active_tile_data is not None:

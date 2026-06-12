@@ -63,6 +63,7 @@ class TileEditor:
                 px, py = self._screen_to_pixel(event.pos)
                 tool = self.tools.get(self.state.active_tool)
                 if tool:
+                    self.state.push_undo()
                     tool.on_mouse_down(px, py, self.state, self.mask)
                 self._last_pixel = (px, py)
                 return True

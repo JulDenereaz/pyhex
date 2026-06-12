@@ -9,6 +9,7 @@ from pyhex.tools.pencil import PencilTool
 from pyhex.tools.eraser import EraserTool
 from pyhex.tools.fill import FillTool
 from pyhex.tools.picker import PickerTool
+from pyhex.tools.noise import NoiseTool
 from pyhex.views.toolbar import ToolBar
 from pyhex.views.palette import ColorPalette
 from pyhex.views.editor import TileEditor
@@ -35,6 +36,7 @@ class Application:
             "eraser": EraserTool(),
             "fill":   FillTool(),
             "picker": PickerTool(),
+            "noise":  NoiseTool(),
         }
 
         font = pygame.font.SysFont(None, 20)
@@ -66,8 +68,13 @@ class Application:
 
     def _handle_global(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_s and (event.mod & pygame.KMOD_CTRL):
+            ctrl = event.mod & pygame.KMOD_CTRL
+            if ctrl and event.key == pygame.K_s:
                 self.state.save(mask=self.hex_mask)
+            elif ctrl and event.key == pygame.K_z:
+                self.state.undo()
+            elif ctrl and event.key == pygame.K_y:
+                self.state.redo()
             elif event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS:
                 self.state.zoom = min(config.MAX_ZOOM, self.state.zoom + 1)
             elif event.key == pygame.K_MINUS:

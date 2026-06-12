@@ -7,6 +7,7 @@ TOOLS = [
     ("eraser", "Eraser", "E"),
     ("fill",   "Fill",   "F"),
     ("picker", "Picker", "K"),
+    ("noise",  "Noise",  "N"),
 ]
 
 BTN_H = 24
@@ -27,7 +28,8 @@ class ToolBar:
                     return True
         if event.type == pygame.KEYDOWN:
             key_map = {pygame.K_p: "pencil", pygame.K_e: "eraser",
-                       pygame.K_f: "fill", pygame.K_k: "picker"}
+                       pygame.K_f: "fill", pygame.K_k: "picker",
+                       pygame.K_n: "noise"}
             if event.key in key_map:
                 self.state.active_tool = key_map[event.key]
                 return True

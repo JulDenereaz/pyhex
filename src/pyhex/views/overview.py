@@ -24,7 +24,21 @@ class TilesetOverview:
                 if r.collidepoint(event.pos):
                     self.state.select_tile(row, col)
                     return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            for row, col, r in self._tile_rects:
+                if r.collidepoint(event.pos):
+                    self._copy_tile(row, col)
+                    return True
         return False
+
+    def _copy_tile(self, row: int, col: int) -> None:
+        if self.state.active_tile_data is None:
+            return
+        if (row, col) == self.state.selected_tile:
+            return
+        self.state.push_undo()
+        self.state.active_tile_data[:] = self.state.tileset.get_tile(row, col)
+        self.state.dirty = True
 
     def draw(self, surf: pygame.Surface, rect: pygame.Rect) -> None:
         self._rect = rect
