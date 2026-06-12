@@ -2,7 +2,6 @@ from __future__ import annotations
 import numpy as np
 import pygame
 from pyhex import config
-from pyhex.hex_geometry import hex_polygon_points
 from pyhex.state import AppState
 
 
@@ -19,8 +18,9 @@ class TileEditor:
         self._mouse_held = False
         self._last_pixel: tuple[int, int] | None = None
         self._origin: tuple[int, int] = (0, 0)
-        # Overlay cached per zoom level — rebuilt only on zoom change
+        # Both caches keyed by zoom — rebuilt only on zoom change
         self._overlay_cache: pygame.Surface | None = None
+        self._boundary_cache: pygame.Surface | None = None
         self._overlay_zoom: int = -1
 
     # ------------------------------------------------------------------
@@ -107,15 +107,10 @@ class TileEditor:
                                  (max(ox, clip_rect.left), sy),
                                  (min(ox + scaled_w, clip_rect.right), sy), 1)
 
-        # 3. Outside-hex opaque overlay (numpy-cached per zoom)
-        overlay = self._get_overlay(zoom)
-        surf.blit(overlay, (ox, oy))
-
-        # 4. Hex boundary
-        pts = hex_polygon_points(tw, th)
-        scaled_pts = [(ox + px * zoom, oy + py * zoom) for px, py in pts]
-        if len(scaled_pts) >= 3:
-            pygame.draw.polygon(surf, config.COLOR_HEX_BORDER, scaled_pts, 2)
+        # 3. Outside-hex opaque overlay + pixel-perfect boundary (numpy-cached per zoom)
+        self._build_caches(zoom)
+        surf.blit(self._overlay_cache,  (ox, oy))
+        surf.blit(self._boundary_cache, (ox, oy))
 
         surf.set_clip(old_clip)
 
@@ -130,30 +125,47 @@ class TileEditor:
                                rect.bottom - dlabel.get_height() - 4))
 
     # ------------------------------------------------------------------
-    def _get_overlay(self, zoom: int) -> pygame.Surface:
-        """Build (and cache) the opaque outside-hex overlay for the given zoom."""
-        if self._overlay_cache is not None and self._overlay_zoom == zoom:
-            return self._overlay_cache
+    def _build_caches(self, zoom: int) -> None:
+        """Build (and cache) the overlay and pixel-perfect boundary for the given zoom."""
+        if self._overlay_zoom == zoom and self._overlay_cache is not None:
+            return
 
         th, tw = self.mask.shape
-        # Boolean mask of pixels OUTSIDE the hex, scaled up by zoom
-        outside = (~self.mask).astype(np.uint8)           # (h, w)
+        H, W = th * zoom, tw * zoom
+
+        # --- outside-hex overlay (nearly opaque) ---
         outside_big = np.repeat(
-            np.repeat(outside, zoom, axis=0), zoom, axis=1
-        )  # (h*zoom, w*zoom)
+            np.repeat((~self.mask).astype(np.uint8), zoom, axis=0), zoom, axis=1
+        )
+        arr_ov = np.zeros((H, W, 4), dtype=np.uint8)
+        arr_ov[outside_big.astype(bool), 3] = 215
 
-        # RGBA: alpha=215 where outside, 0 where inside
-        arr = np.zeros((th * zoom, tw * zoom, 4), dtype=np.uint8)
-        outside_bool = outside_big.astype(bool)
-        arr[outside_bool, 3] = 215   # nearly opaque
+        ov = pygame.Surface((W, H), pygame.SRCALPHA)
+        pygame.surfarray.blit_array(ov, arr_ov.transpose(1, 0, 2)[:, :, :3])
+        pygame.surfarray.pixels_alpha(ov)[:] = arr_ov[:, :, 3].T
 
-        surf = pygame.Surface((tw * zoom, th * zoom), pygame.SRCALPHA)
-        pygame.surfarray.blit_array(surf, arr.transpose(1, 0, 2)[:, :, :3])
-        pygame.surfarray.pixels_alpha(surf)[:] = arr[:, :, 3].T
+        # --- pixel-perfect boundary derived from the mask ---
+        # A pixel is on the boundary if inside AND has at least one outside 4-neighbor
+        left  = np.pad(self.mask[:, :-1], ((0, 0), (1, 0)), constant_values=False)
+        right = np.pad(self.mask[:, 1:],  ((0, 0), (0, 1)), constant_values=False)
+        up    = np.pad(self.mask[:-1, :], ((1, 0), (0, 0)), constant_values=False)
+        down  = np.pad(self.mask[1:,  :], ((0, 1), (0, 0)), constant_values=False)
+        boundary = self.mask & ~(left & right & up & down)
 
-        self._overlay_cache = surf
-        self._overlay_zoom = zoom
-        return surf
+        boundary_big = np.repeat(
+            np.repeat(boundary.astype(np.uint8), zoom, axis=0), zoom, axis=1
+        )
+        r, g, b = config.COLOR_HEX_BORDER
+        arr_bnd = np.zeros((H, W, 4), dtype=np.uint8)
+        arr_bnd[boundary_big.astype(bool)] = [r, g, b, 255]
+
+        bnd = pygame.Surface((W, H), pygame.SRCALPHA)
+        pygame.surfarray.blit_array(bnd, arr_bnd.transpose(1, 0, 2)[:, :, :3])
+        pygame.surfarray.pixels_alpha(bnd)[:] = arr_bnd[:, :, 3].T
+
+        self._overlay_cache   = ov
+        self._boundary_cache  = bnd
+        self._overlay_zoom    = zoom
 
     def _screen_to_pixel(self, pos: tuple[int, int]) -> tuple[int, int]:
         ox, oy = self._origin
