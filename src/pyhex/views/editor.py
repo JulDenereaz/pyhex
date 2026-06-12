@@ -257,12 +257,13 @@ class TileEditor:
         pygame.surfarray.blit_array(ov, arr_ov.transpose(1, 0, 2)[:, :, :3])
         pygame.surfarray.pixels_alpha(ov)[:] = arr_ov[:, :, 3].T
 
-        # Pixel-perfect boundary: inside pixels with ≥1 outside 4-neighbor
-        left  = np.pad(self.mask[:, :-1], ((0, 0), (1, 0)), constant_values=False)
-        right = np.pad(self.mask[:, 1:],  ((0, 0), (0, 1)), constant_values=False)
-        up    = np.pad(self.mask[:-1, :], ((1, 0), (0, 0)), constant_values=False)
-        down  = np.pad(self.mask[1:,  :], ((0, 1), (0, 0)), constant_values=False)
-        boundary = self.mask & ~(left & right & up & down)
+        # Boundary ring: OUTSIDE pixels adjacent to the hex interior.
+        # Sitting on the dark overlay means it never covers drawable pixels.
+        left_in  = np.pad(self.mask[:, :-1], ((0, 0), (1, 0)), constant_values=False)
+        right_in = np.pad(self.mask[:, 1:],  ((0, 0), (0, 1)), constant_values=False)
+        up_in    = np.pad(self.mask[:-1, :], ((1, 0), (0, 0)), constant_values=False)
+        down_in  = np.pad(self.mask[1:,  :], ((0, 1), (0, 0)), constant_values=False)
+        boundary = (~self.mask) & (left_in | right_in | up_in | down_in)
 
         boundary_big = np.repeat(
             np.repeat(boundary.astype(np.uint8), zoom, axis=0), zoom, axis=1)
