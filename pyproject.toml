@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyhex"
+version = "0.1.0"
+description = "Hexagonal tileset pixel editor"
+requires-python = ">=3.12"
+dependencies = [
+    "pygame>=2.5",
+    "Pillow>=10.0",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest", "pytest-cov"]
+
+[project.scripts]
+pyhex = "pyhex.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyhex"]
+
+[tool.ruff]
+line-length = 99
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

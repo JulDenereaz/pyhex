@@ -1,0 +1,19 @@
+services:
+  pyhex:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: pyhex:latest
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - SDL_VIDEODRIVER=x11
+    volumes:
+      # X11 socket (WSLg exposes at /tmp/.X11-unix)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Tileset files
+      - ./assets:/app/assets:rw
+      # Dev: live-reload source changes without rebuild
+      - ./src:/app/src:rw
+    network_mode: host
+    stdin_open: true
+    tty: true
