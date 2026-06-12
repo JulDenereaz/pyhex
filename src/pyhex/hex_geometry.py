@@ -4,14 +4,13 @@ import numpy as np
 SQRT3 = sqrt(3)
 
 
-def hex_tile_size(circumradius: int) -> tuple[int, int]:
-    """Return (width, height) bounding box for a pointy-top hex.
+def hex_tile_size(tile_size: int) -> tuple[int, int]:
+    """Return (width, height) — square tiles of exactly tile_size × tile_size pixels.
 
-    Tiles are square (2R × 2R) so the hex is centred with transparent padding
-    on the sides.  circumradius=32 → 64×64 tiles, 4×4 tileset = 256×256.
+    --tile-size 32  →  32×32 tile  (circumradius = 16, inradius ≈ 13.9)
+    --tile-size 64  →  64×64 tile  (circumradius = 32, inradius ≈ 27.7)
     """
-    size = 2 * circumradius
-    return size, size
+    return tile_size, tile_size
 
 
 def make_hex_mask(width: int, height: int) -> np.ndarray:

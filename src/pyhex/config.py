@@ -6,7 +6,7 @@ LEFT_PANEL_W = 200
 OVERVIEW_H = 260
 TOOLBAR_H = 145
 
-DEFAULT_TILE_SIZE = 32  # circumradius in pixels
+DEFAULT_TILE_SIZE = 64  # tile pixel size (--tile-size N → N×N tile)
 DEFAULT_ZOOM = 8
 MIN_ZOOM = 2
 MAX_ZOOM = 32

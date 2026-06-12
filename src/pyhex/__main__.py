@@ -17,7 +17,7 @@ def main() -> None:
         type=int,
         default=config.DEFAULT_TILE_SIZE,
         metavar="S",
-        help="Hex circumradius in pixels (default %(default)s → %(default)s*2 × round(%(default)s*√3) bbox)",
+        help="Tile pixel size: --tile-size 32 → 32×32 tile, --tile-size 64 → 64×64 tile (default %(default)s)",
     )
     args = parser.parse_args()
 

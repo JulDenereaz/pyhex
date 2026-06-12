@@ -6,8 +6,8 @@ from pyhex.hex_geometry import hex_tile_size, make_hex_mask, hex_polygon_points
 
 def test_tile_size_dimensions():
     w, h = hex_tile_size(32)
-    assert w == 64   # square tiles: 2 * circumradius
-    assert h == 64
+    assert w == 32   # tile_size argument is the direct pixel dimension
+    assert h == 32
 
 
 def test_mask_shape():
