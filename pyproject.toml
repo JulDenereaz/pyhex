@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "pyhex"
 version = "0.1.0"
 description = "Hexagonal tileset pixel editor"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "pygame>=2.5",
