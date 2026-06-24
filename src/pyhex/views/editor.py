@@ -36,10 +36,9 @@ class TileEditor:
         # Hover coordinate for display
         self._hover_pixel: tuple[int, int] | None = None
 
-        # Numpy-cached overlay + boundary (rebuilt only on zoom change)
-        self._overlay_cache:  pygame.Surface | None = None
-        self._boundary_cache: pygame.Surface | None = None
-        self._overlay_zoom:   int = -1
+        # Numpy-cached overlay (rebuilt only on zoom change)
+        self._overlay_cache: pygame.Surface | None = None
+        self._overlay_zoom:  int = -1
 
     # ------------------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> bool:
@@ -164,10 +163,9 @@ class TileEditor:
                                  (max(ox, clip_rect.left), sy),
                                  (min(ox + scaled_w, clip_rect.right), sy), 1)
 
-        # 3. Outside-hex overlay + pixel-perfect hex boundary
+        # 3. Outside-hex overlay
         self._build_caches(zoom)
-        surf.blit(self._overlay_cache,  (ox, oy))
-        surf.blit(self._boundary_cache, (ox, oy))
+        surf.blit(self._overlay_cache, (ox, oy))
 
         # 4. Cursor highlight on hovered pixel
         if self._hover_pixel is not None:
@@ -241,14 +239,13 @@ class TileEditor:
 
     # ------------------------------------------------------------------
     def _build_caches(self, zoom: int) -> None:
-        """Build (and cache) the overlay and pixel-perfect boundary for the given zoom."""
+        """Build (and cache) the outside-hex overlay for the given zoom."""
         if self._overlay_zoom == zoom and self._overlay_cache is not None:
             return
 
         th, tw = self.mask.shape
         H, W   = th * zoom, tw * zoom
 
-        # Outside-hex overlay (nearly opaque dark)
         outside_big = np.repeat(
             np.repeat((~self.mask).astype(np.uint8), zoom, axis=0), zoom, axis=1)
         arr_ov = np.zeros((H, W, 4), dtype=np.uint8)
@@ -258,27 +255,8 @@ class TileEditor:
         pygame.surfarray.blit_array(ov, arr_ov.transpose(1, 0, 2)[:, :, :3])
         pygame.surfarray.pixels_alpha(ov)[:] = arr_ov[:, :, 3].T
 
-        # Boundary ring: OUTSIDE pixels adjacent to the hex interior.
-        # Sitting on the dark overlay means it never covers drawable pixels.
-        left_in  = np.pad(self.mask[:, :-1], ((0, 0), (1, 0)), constant_values=False)
-        right_in = np.pad(self.mask[:, 1:],  ((0, 0), (0, 1)), constant_values=False)
-        up_in    = np.pad(self.mask[:-1, :], ((1, 0), (0, 0)), constant_values=False)
-        down_in  = np.pad(self.mask[1:,  :], ((0, 1), (0, 0)), constant_values=False)
-        boundary = (~self.mask) & (left_in | right_in | up_in | down_in)
-
-        boundary_big = np.repeat(
-            np.repeat(boundary.astype(np.uint8), zoom, axis=0), zoom, axis=1)
-        r, g, b = config.COLOR_HEX_BORDER
-        arr_bnd = np.zeros((H, W, 4), dtype=np.uint8)
-        arr_bnd[boundary_big.astype(bool)] = [r, g, b, 255]
-
-        bnd = pygame.Surface((W, H), pygame.SRCALPHA)
-        pygame.surfarray.blit_array(bnd, arr_bnd.transpose(1, 0, 2)[:, :, :3])
-        pygame.surfarray.pixels_alpha(bnd)[:] = arr_bnd[:, :, 3].T
-
-        self._overlay_cache  = ov
-        self._boundary_cache = bnd
-        self._overlay_zoom   = zoom
+        self._overlay_cache = ov
+        self._overlay_zoom  = zoom
 
     # ------------------------------------------------------------------
     def _screen_to_pixel(self, pos: tuple[int, int]) -> tuple[int, int]:

@@ -4,7 +4,7 @@ TARGET_FPS = 60
 
 LEFT_PANEL_W = 200
 OVERVIEW_H = 260
-TOOLBAR_H = 242
+TOOLBAR_H = 300
 
 DEFAULT_TILE_SIZE = 64  # tile pixel size (--tile-size N → N×N tile)
 DEFAULT_ZOOM = 8
@@ -22,7 +22,6 @@ COLOR_DIRTY = (220, 100, 60)
 
 # Pixel grid overlay
 COLOR_GRID = (60, 60, 60)
-COLOR_HEX_BORDER = (100, 180, 100)
 
 # PICO-8 palette (32 colors: original 16 + secret 16)
 PALETTE = [

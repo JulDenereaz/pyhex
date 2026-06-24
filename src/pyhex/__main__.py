@@ -1,15 +1,18 @@
 import argparse
 import sys
+from pathlib import Path
 import pygame
 from pyhex.app import Application
 from pyhex import config
+
+_DEFAULT_TILESET = "assets/tileset.png"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="pyhex — Hexagonal tileset pixel editor")
     parser.add_argument(
         "--tileset",
-        default="assets/tileset.png",
+        default=_DEFAULT_TILESET,
         help="Path to the tileset PNG (created blank if absent)",
     )
     parser.add_argument(
@@ -20,6 +23,12 @@ def main() -> None:
         help="Tile pixel size: --tile-size 32 → 32×32 tile, --tile-size 64 → 64×64 tile (default %(default)s)",
     )
     args = parser.parse_args()
+
+    # Auto-suffix the default path with the tile size so different resolutions
+    # stay in separate files (e.g. tileset_32.png, tileset_64.png).
+    if args.tileset == _DEFAULT_TILESET:
+        p = Path(args.tileset)
+        args.tileset = str(p.parent / f"{p.stem}_{args.tile_size}{p.suffix}")
 
     pygame.display.init()
     pygame.font.init()

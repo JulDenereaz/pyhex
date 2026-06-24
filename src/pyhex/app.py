@@ -41,7 +41,10 @@ class Application:
         }
 
         font = pygame.font.SysFont(None, 20)
-        self.toolbar  = ToolBar(self.state, font, on_open=self._open_file)
+        self.toolbar  = ToolBar(self.state, font,
+                                on_open=self._open_file,
+                                on_add_row=self._add_tileset_row,
+                                on_add_col=self._add_tileset_col)
         self.palette  = ColorPalette(self.state, font)
         self.editor   = TileEditor(self.state, self.hex_mask, self.tools, font)
         self.overview = TilesetOverview(self.state, self.hex_mask, font)
@@ -105,6 +108,16 @@ class Application:
         start = (str(Path(self.state.tileset.path).parent)
                  if self.state.tileset else ".")
         self._file_browser = FileBrowser(start)
+
+    def _add_tileset_row(self) -> None:
+        if self.state.tileset:
+            self.state.tileset.add_row()
+            self.state.dirty = True
+
+    def _add_tileset_col(self) -> None:
+        if self.state.tileset:
+            self.state.tileset.add_col()
+            self.state.dirty = True
 
     def _load_tileset(self, path: str) -> None:
         if self.state.dirty:

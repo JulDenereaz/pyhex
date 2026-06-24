@@ -1,6 +1,6 @@
-from collections import deque
 import numpy as np
 from pyhex.state import AppState
+from pyhex.tools._flood import flood_region
 
 
 class FillTool:
@@ -12,26 +12,12 @@ class FillTool:
             return
         if not mask[py, px]:
             return
-        target = tuple(state.active_tile_data[py, px])
         fill = tuple(state.foreground_color)
-        if target == fill:
+        if tuple(state.active_tile_data[py, px]) == fill:
             return
-        self._bfs(px, py, target, fill, state.active_tile_data, mask, w, h)
+        region = flood_region(px, py, state.active_tile_data, mask, w, h)
+        state.active_tile_data[region] = fill
         state.dirty = True
 
     def on_mouse_drag(self, px: int, py: int, state: AppState, mask: np.ndarray) -> None:
         pass
-
-    def _bfs(self, sx, sy, target, fill, tile, mask, w, h):
-        q = deque([(sx, sy)])
-        visited = np.zeros((h, w), dtype=bool)
-        visited[sy, sx] = True
-        while q:
-            x, y = q.popleft()
-            if tuple(tile[y, x]) != target:
-                continue
-            tile[y, x] = fill
-            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                if 0 <= nx < w and 0 <= ny < h and not visited[ny, nx] and mask[ny, nx]:
-                    visited[ny, nx] = True
-                    q.append((nx, ny))

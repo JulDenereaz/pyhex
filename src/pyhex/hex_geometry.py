@@ -7,6 +7,7 @@ SQRT3 = sqrt(3)
 def hex_tile_size(tile_size: int) -> tuple[int, int]:
     """Return (width, height) — square tiles of tile_size × tile_size pixels.
 
+    Flat-top orientation: left/right vertices, top/bottom flat edges.
     --tile-size 32  →  32×32  (Rc=16)
     --tile-size 64  →  64×64  (Rc=32)
     """
@@ -15,17 +16,21 @@ def hex_tile_size(tile_size: int) -> tuple[int, int]:
 
 def make_hex_mask(width: int, height: int) -> np.ndarray:
     """
-    Boolean mask [height, width] — True where the pixel is inside a pointy-top
-    hex centred in the (width × height) bounding box.
+    Boolean mask [height, width] — True where the pixel is inside a flat-top
+    hex centred in the (width × height) bounding box, stretched to fill the
+    full tile width AND full tile height.
 
-    Three half-plane conditions (circumradius Rc = height/2):
-      |dy| <= Rc                          top/bottom vertex extent
-      |dx| <= Rc * sqrt(3)/2              left/right flat-edge extent
-      |dx|*sqrt(3) + |dy| <= 2*Rc        diagonal edges
+    Circumradius Rc = width/2  (left/right vertices at tile edges).
+    Inradius      r  = height/2 (top/bottom flat edges at tile edges).
+
+    For a square tile r = Rc, giving a squished (non-regular) hex.
+    General diagonal condition:  Rc*|dy| + 2*r*|dx| <= 2*r*Rc
+    With r = Rc this simplifies to: |dy| + 2*|dx| <= 2*Rc
     """
     cx = width  / 2.0
     cy = height / 2.0
-    Rc = height / 2.0
+    Rc = width  / 2.0   # circumradius (left/right vertex distance from centre)
+    r  = height / 2.0   # inradius    (top/bottom flat-edge distance from centre)
 
     xs = np.arange(width,  dtype=float) + 0.5
     ys = (np.arange(height, dtype=float) + 0.5).reshape(-1, 1)
@@ -33,28 +38,27 @@ def make_hex_mask(width: int, height: int) -> np.ndarray:
     dx = np.abs(xs - cx)
     dy = np.abs(ys - cy)
 
-    top_bottom = dy <= Rc
-    lateral    = dx <= Rc * SQRT3 / 2.0   # flat vertical edges
-    diag_edges = dx + SQRT3 * dy <= SQRT3 * Rc  # pointy top/bottom
+    lateral    = dx <= Rc                                        # left/right vertex extent
+    top_bottom = dy <= r                                         # top/bottom flat-edge extent
+    # Corner is at (Rc/2, r) — a tile-edge coordinate, 0.5px from nearest pixel
+    # centre.  Adding 0.5*Rc closes the 1-pixel gap that appears in tiled grids.
+    diag_edges = Rc * dy + 2 * r * dx <= 2 * r * Rc + 0.5 * Rc
 
-    return top_bottom & lateral & diag_edges
+    return lateral & top_bottom & diag_edges
 
 
 def hex_polygon_points(width: int, height: int) -> list[tuple[int, int]]:
-    """
-    Return the 6 vertex coordinates of a pointy-top hex centred in (width, height).
-    Always uses the geometric inradius so the polygon matches the mask exactly.
-    """
+    """Return the 6 vertex coordinates of a flat-top stretched hex."""
     cx = width  / 2.0
     cy = height / 2.0
-    Rc = height / 2.0          # circumradius
-    r  = Rc * SQRT3 / 2.0     # true inradius (flat edge to centre)
+    Rc = width  / 2.0   # circumradius (horizontal)
+    r  = height / 2.0   # inradius    (vertical)
 
     return [
-        (round(cx),      round(cy - Rc)),       # top
-        (round(cx + r),  round(cy - Rc / 2)),   # top-right
-        (round(cx + r),  round(cy + Rc / 2)),   # bottom-right
-        (round(cx),      round(cy + Rc)),        # bottom
-        (round(cx - r),  round(cy + Rc / 2)),   # bottom-left
-        (round(cx - r),  round(cy - Rc / 2)),   # top-left
+        (round(cx + Rc),      round(cy)),           # right vertex
+        (round(cx + Rc / 2),  round(cy - r)),       # top-right corner
+        (round(cx - Rc / 2),  round(cy - r)),       # top-left corner
+        (round(cx - Rc),      round(cy)),            # left vertex
+        (round(cx - Rc / 2),  round(cy + r)),       # bottom-left corner
+        (round(cx + Rc / 2),  round(cy + r)),       # bottom-right corner
     ]

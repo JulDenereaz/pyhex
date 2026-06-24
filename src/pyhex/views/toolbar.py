@@ -17,21 +17,35 @@ BAR_H   = 8   # slider track height
 
 class ToolBar:
     def __init__(self, state: AppState, font: pygame.font.Font,
-                 on_open: "callable | None" = None):
-        self.state    = state
-        self.font     = font
-        self._on_open = on_open
+                 on_open: "callable | None" = None,
+                 on_add_row: "callable | None" = None,
+                 on_add_col: "callable | None" = None):
+        self.state       = state
+        self.font        = font
+        self._on_open    = on_open
+        self._on_add_row = on_add_row
+        self._on_add_col = on_add_col
         self._rects: dict[str, pygame.Rect] = {}
         self._open_rect     = pygame.Rect(0, 0, 0, 0)
+        self._add_row_rect  = pygame.Rect(0, 0, 0, 0)
+        self._add_col_rect  = pygame.Rect(0, 0, 0, 0)
         self._slider_rect   = pygame.Rect(0, 0, 0, 0)
         self._dragging_slider = False
 
     def handle_event(self, event: pygame.event.Event) -> bool:
-        # ---- open button ----
+        # ---- open / expand buttons ----
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._open_rect.collidepoint(event.pos):
                 if self._on_open:
                     self._on_open()
+                return True
+            if self._add_row_rect.collidepoint(event.pos):
+                if self._on_add_row:
+                    self._on_add_row()
+                return True
+            if self._add_col_rect.collidepoint(event.pos):
+                if self._on_add_col:
+                    self._on_add_col()
                 return True
 
         # ---- tool buttons ----
@@ -95,6 +109,25 @@ class ToolBar:
             text = self.font.render(f"{display}  [{shortcut}]", True, config.COLOR_TEXT)
             surf.blit(text, (x + 6, y + (BTN_H - text.get_height()) // 2))
             y += BTN_H + BTN_PAD
+
+        # Expand tileset buttons
+        y += BTN_PAD * 2
+        exp_label = self.font.render("Tileset", True, config.COLOR_TEXT)
+        surf.blit(exp_label, (x, y))
+        y += exp_label.get_height() + BTN_PAD
+
+        half_w = (btn_w - BTN_PAD) // 2
+        row_rect = pygame.Rect(x, y, half_w, BTN_H)
+        col_rect = pygame.Rect(x + half_w + BTN_PAD, y, btn_w - half_w - BTN_PAD, BTN_H)
+        self._add_row_rect = row_rect
+        self._add_col_rect = col_rect
+        for r, label in ((row_rect, "+ Row"), (col_rect, "+ Col")):
+            pygame.draw.rect(surf, (55, 55, 80), r, border_radius=3)
+            pygame.draw.rect(surf, config.COLOR_BORDER, r, 1, border_radius=3)
+            lbl = self.font.render(label, True, config.COLOR_TEXT)
+            surf.blit(lbl, (r.x + (r.width - lbl.get_width()) // 2,
+                            r.y + (BTN_H - lbl.get_height()) // 2))
+        y += BTN_H + BTN_PAD
 
         # Variation slider — only when noise tool is selected
         if self.state.active_tool == "noise":

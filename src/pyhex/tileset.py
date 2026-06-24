@@ -54,5 +54,16 @@ class Tileset:
                 ] = tile
         Image.fromarray(arr, "RGBA").save(self.path)
 
+    def add_row(self) -> None:
+        blank = np.zeros((self.tile_h, self.tile_w, 4), dtype=np.uint8)
+        self.tiles.append([blank.copy() for _ in range(self.cols)])
+        self.rows += 1
+
+    def add_col(self) -> None:
+        blank = np.zeros((self.tile_h, self.tile_w, 4), dtype=np.uint8)
+        for row in self.tiles:
+            row.append(blank.copy())
+        self.cols += 1
+
     def reload(self) -> None:
         self._load()
